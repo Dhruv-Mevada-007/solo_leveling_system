@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:solo_leveling_system/screens/profile/profile_screen.dart';
-import 'package:solo_leveling_system/screens/quests/quests_screen.dart';
-import 'package:solo_leveling_system/screens/tasks/tasks_screen.dart';
-import '../../theme/app_theme.dart';
+import '../theme/app_theme.dart';
+import 'quests/quests_screen.dart';
+import 'habits/habits_screen.dart';
+import 'tasks/tasks_screen.dart';
+import 'reminders/reminders_screen.dart';
+import 'profile/profile_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -15,28 +17,24 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> with TickerProviderStateMixin {
   int _currentIndex = 0;
   late PageController _pageController;
-  late AnimationController _navAnimController;
 
   static const _screens = [
     QuestsScreen(),
+    HabitsScreen(),
     TasksScreen(),
+    RemindersScreen(),
     ProfileScreen(),
   ];
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0);
-    _navAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
+    _pageController = PageController();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _navAnimController.dispose();
     super.dispose();
   }
 
@@ -45,7 +43,7 @@ class _MainShellState extends State<MainShell> with TickerProviderStateMixin {
     setState(() => _currentIndex = index);
     _pageController.animateToPage(
       index,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 280),
       curve: Curves.easeInOut,
     );
   }
@@ -77,9 +75,11 @@ class _SystemNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _NavItem(label: 'Quests', icon: Icons.grid_view_rounded, activeIcon: Icons.grid_view_rounded),
-      _NavItem(label: 'Tasks', icon: Icons.list_alt_outlined, activeIcon: Icons.list_alt_rounded),
-      _NavItem(label: 'Profile', icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded),
+      _NavItem('Quests',    Icons.grid_view_outlined,    Icons.grid_view_rounded,     AppColors.systemBlue),
+      _NavItem('Habits',    Icons.repeat_outlined,        Icons.repeat_rounded,         AppColors.agilityColor),
+      _NavItem('Tasks',     Icons.list_alt_outlined,      Icons.list_alt_rounded,       AppColors.systemBlue),
+      _NavItem('Notes',     Icons.push_pin_outlined,      Icons.push_pin_rounded,       AppColors.manaColor),
+      _NavItem('Profile',   Icons.person_outline_rounded, Icons.person_rounded,         AppColors.rankA),
     ];
 
     return Container(
@@ -95,6 +95,7 @@ class _SystemNavBar extends StatelessWidget {
             children: List.generate(items.length, (i) {
               final item = items[i];
               final isActive = i == currentIndex;
+              final color = item.color;
               return Expanded(
                 child: GestureDetector(
                   onTap: () => onTap(i),
@@ -104,27 +105,30 @@ class _SystemNavBar extends StatelessWidget {
                     children: [
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? AppColors.systemBlue.withAlpha(20)
+                              ? color.withAlpha(25)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           isActive ? item.activeIcon : item.icon,
-                          size: 22,
-                          color: isActive ? AppColors.systemBlue : AppColors.textMuted,
+                          size: 21,
+                          color: isActive ? color : AppColors.textMuted,
                         ),
                       ),
                       const SizedBox(height: 2),
                       AnimatedDefaultTextStyle(
                         duration: const Duration(milliseconds: 200),
                         style: TextStyle(
-                          fontSize: 9,
-                          letterSpacing: 1,
-                          color: isActive ? AppColors.systemBlue : AppColors.textMuted,
-                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                          fontSize: 8,
+                          letterSpacing: 0.5,
+                          color: isActive ? color : AppColors.textMuted,
+                          fontWeight: isActive
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
                         child: Text(item.label.toUpperCase()),
                       ),
@@ -136,7 +140,11 @@ class _SystemNavBar extends StatelessWidget {
           ),
         ),
       ),
-    ).animate().slideY(begin: 1, duration: 400.ms, delay: 300.ms, curve: Curves.easeOut);
+    ).animate().slideY(
+        begin: 1,
+        duration: 400.ms,
+        delay: 300.ms,
+        curve: Curves.easeOut);
   }
 }
 
@@ -144,5 +152,7 @@ class _NavItem {
   final String label;
   final IconData icon;
   final IconData activeIcon;
-  const _NavItem({required this.label, required this.icon, required this.activeIcon});
+  final Color color;
+  const _NavItem(this.label, this.icon, this.activeIcon, this.color);
 }
+

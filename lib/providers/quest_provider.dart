@@ -223,6 +223,12 @@ class QuestProvider extends ChangeNotifier {
     await _storage.saveQuests(_quests);
   }
 
+  /// Called by HabitProvider to save hunter after XP award
+  Future<void> persistHunter() async {
+    await _storage.saveHunter(_hunter);
+    notifyListeners();
+  }
+
   // ── Default Quest Seeds ────────────────────────────────────
   List<Quest> _defaultQuests() {
     final now = DateTime.now();

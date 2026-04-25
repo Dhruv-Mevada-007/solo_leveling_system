@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/quest_provider.dart';
+import 'providers/habit_provider.dart';
+import 'providers/reminder_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_shell.dart';
 import 'screens/splash_screen.dart';
@@ -9,13 +11,11 @@ import 'screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Force portrait mode
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Deep dark status bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -36,6 +36,12 @@ class SoloLevelingApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => QuestProvider()..init()),
+        ChangeNotifierProxyProvider<QuestProvider, HabitProvider>(
+          create: (ctx) => HabitProvider(ctx.read<QuestProvider>())..init(),
+          update: (_, quest, habit) => habit!,
+          lazy: false,
+        ),
+        ChangeNotifierProvider(create: (_) => ReminderProvider()..init()),
       ],
       child: MaterialApp(
         title: 'Solo System',
@@ -60,7 +66,6 @@ class _AppLoaderState extends State<AppLoader> {
   @override
   void initState() {
     super.initState();
-    // Show splash for min 2.5 seconds
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) setState(() => _splashDone = true);
     });
@@ -68,12 +73,10 @@ class _AppLoaderState extends State<AppLoader> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<QuestProvider>();
-
-    if (!_splashDone || provider.isLoading) {
+    final questProvider = context.watch<QuestProvider>();
+    if (!_splashDone || questProvider.isLoading) {
       return const SplashScreen();
     }
-
     return const MainShell();
   }
 }
