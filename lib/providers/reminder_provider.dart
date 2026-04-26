@@ -22,6 +22,7 @@ class ReminderProvider extends ChangeNotifier {
   Future<void> init() async {
     _isLoading = true;
     notifyListeners();
+    await _storage.init(); // ensure SharedPreferences is ready regardless of order
     _reminders = await _storage.loadReminders();
     if (_reminders.isEmpty) _reminders = _defaults();
     _isLoading = false;

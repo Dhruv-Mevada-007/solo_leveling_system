@@ -38,6 +38,7 @@ class HabitProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    await _storage.init(); // ensure SharedPreferences is ready regardless of order
     _habits = await _storage.loadHabits();
     if (_habits.isEmpty) _habits = _defaultHabits();
 

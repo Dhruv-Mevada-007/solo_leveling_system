@@ -19,6 +19,7 @@ class StorageService {
   SharedPreferences? _prefs;
 
   Future<void> init() async {
+    if (_prefs != null) return; // already initialized
     _prefs = await SharedPreferences.getInstance();
   }
 

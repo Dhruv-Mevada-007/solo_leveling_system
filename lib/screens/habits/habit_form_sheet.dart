@@ -70,24 +70,28 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.habit != null;
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.bgSecondary,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(bottom: keyboardHeight),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.92,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, controller) => Column(
-          children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 6),
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Padding(
+        padding: MediaQuery.of(context).viewInsets,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.bgSecondary,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: DraggableScrollableSheet(
+          initialChildSize: 0.92,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, controller) => Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 6),
               width: 36, height: 4,
               decoration: BoxDecoration(
                   color: AppColors.border,
@@ -115,6 +119,8 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
             Expanded(
               child: ListView(
                 controller: controller,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                 children: [
                   Form(
@@ -266,7 +272,9 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
           ],
         ),
       ),
-    );
+    ), // Container
+    ), // Padding
+    ); // PopScope
   }
 
   Widget _label(String t) => Text(t,

@@ -220,6 +220,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
 
   void _showFilterSheet(BuildContext context) {
     showModalBottomSheet(
+      isScrollControlled: true,
       context: context,
       backgroundColor: AppColors.bgSecondary,
       shape: const RoundedRectangleBorder(
