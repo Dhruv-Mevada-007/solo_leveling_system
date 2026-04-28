@@ -10,24 +10,24 @@ class Quest {
   String title;
   String description;
   int xpReward;
-  DateTime deadline;
+  DateTime? deadline; // null = no deadline
   QuestRarity rarity;
   QuestStatus status;
   List<String> tags;
-  String? penaltyTaskId; // linked penalty task if failed
+  String? penaltyTaskId;
   bool hasPenalty;
-  int? penaltyXp; // xp deducted if penalty not done
+  int? penaltyXp;
   String? penaltyDescription;
   DateTime? completedAt;
   DateTime createdAt;
-  int? unlockLevel; // null = always available
+  int? unlockLevel;
 
   Quest({
     String? id,
     required this.title,
     required this.description,
     required this.xpReward,
-    required this.deadline,
+    this.deadline,
     this.rarity = QuestRarity.common,
     this.status = QuestStatus.active,
     this.tags = const [],
@@ -38,37 +38,49 @@ class Quest {
     this.completedAt,
     DateTime? createdAt,
     this.unlockLevel,
+    this.penaltyTier = 0,
+    this.xpPenaltyOnExpiry = 0,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
-  bool get isOverdue => deadline.isBefore(DateTime.now()) && status == QuestStatus.active;
+  bool get hasDeadline => deadline != null;
+  bool get isOverdue =>
+      deadline != null &&
+      deadline!.isBefore(DateTime.now()) &&
+      status == QuestStatus.active;
   bool get isLocked => unlockLevel != null;
+
+  /// For penalty quests: 0=first spawn, 1=first escalation, 2=second, 3=final
+  int penaltyTier;
+
+  /// XP deducted from hunter when this penalty quest expires unfinished
+  int xpPenaltyOnExpiry;
 
   Color get rarityColor {
     switch (rarity) {
       case QuestRarity.legendary: return const Color(0xFFFFD700);
-      case QuestRarity.epic: return const Color(0xFFA855F7);
-      case QuestRarity.rare: return const Color(0xFF4A9EFF);
-      case QuestRarity.common: return const Color(0xFF22C55E);
+      case QuestRarity.epic:      return const Color(0xFFA855F7);
+      case QuestRarity.rare:      return const Color(0xFF4A9EFF);
+      case QuestRarity.common:    return const Color(0xFF22C55E);
     }
   }
 
   Color get statusColor {
     switch (status) {
-      case QuestStatus.active: return const Color(0xFF4A9EFF);
+      case QuestStatus.active:    return const Color(0xFF4A9EFF);
       case QuestStatus.completed: return const Color(0xFF22C55E);
-      case QuestStatus.failed: return const Color(0xFFEF4444);
-      case QuestStatus.locked: return const Color(0xFF888888);
-      case QuestStatus.penalty: return const Color(0xFFEF4444);
+      case QuestStatus.failed:    return const Color(0xFFEF4444);
+      case QuestStatus.locked:    return const Color(0xFF888888);
+      case QuestStatus.penalty:   return const Color(0xFFEF4444);
     }
   }
 
   String get rarityLabel {
     switch (rarity) {
       case QuestRarity.legendary: return 'LEGENDARY';
-      case QuestRarity.epic: return 'EPIC';
-      case QuestRarity.rare: return 'RARE';
-      case QuestRarity.common: return 'COMMON';
+      case QuestRarity.epic:      return 'EPIC';
+      case QuestRarity.rare:      return 'RARE';
+      case QuestRarity.common:    return 'COMMON';
     }
   }
 
@@ -76,7 +88,7 @@ class Quest {
     String? title,
     String? description,
     int? xpReward,
-    DateTime? deadline,
+    Object? deadline = _sentinel,
     QuestRarity? rarity,
     QuestStatus? status,
     List<String>? tags,
@@ -86,13 +98,15 @@ class Quest {
     String? penaltyDescription,
     DateTime? completedAt,
     int? unlockLevel,
+    int? penaltyTier,
+    int? xpPenaltyOnExpiry,
   }) {
     return Quest(
       id: id,
       title: title ?? this.title,
       description: description ?? this.description,
       xpReward: xpReward ?? this.xpReward,
-      deadline: deadline ?? this.deadline,
+      deadline: deadline == _sentinel ? this.deadline : deadline as DateTime?,
       rarity: rarity ?? this.rarity,
       status: status ?? this.status,
       tags: tags ?? this.tags,
@@ -103,6 +117,8 @@ class Quest {
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt,
       unlockLevel: unlockLevel ?? this.unlockLevel,
+      penaltyTier: penaltyTier ?? this.penaltyTier,
+      xpPenaltyOnExpiry: xpPenaltyOnExpiry ?? this.xpPenaltyOnExpiry,
     );
   }
 
@@ -111,7 +127,7 @@ class Quest {
     'title': title,
     'description': description,
     'xpReward': xpReward,
-    'deadline': deadline.toIso8601String(),
+    'deadline': deadline?.toIso8601String(),
     'rarity': rarity.index,
     'status': status.index,
     'tags': tags,
@@ -122,6 +138,8 @@ class Quest {
     'completedAt': completedAt?.toIso8601String(),
     'createdAt': createdAt.toIso8601String(),
     'unlockLevel': unlockLevel,
+    'penaltyTier': penaltyTier,
+    'xpPenaltyOnExpiry': xpPenaltyOnExpiry,
   };
 
   factory Quest.fromJson(Map<String, dynamic> json) => Quest(
@@ -129,7 +147,7 @@ class Quest {
     title: json['title'],
     description: json['description'],
     xpReward: json['xpReward'],
-    deadline: DateTime.parse(json['deadline']),
+    deadline: json['deadline'] != null ? DateTime.parse(json['deadline']) : null,
     rarity: QuestRarity.values[json['rarity']],
     status: QuestStatus.values[json['status']],
     tags: List<String>.from(json['tags'] ?? []),
@@ -140,5 +158,10 @@ class Quest {
     completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
     createdAt: DateTime.parse(json['createdAt']),
     unlockLevel: json['unlockLevel'],
+    penaltyTier: json['penaltyTier'] ?? 0,
+    xpPenaltyOnExpiry: json['xpPenaltyOnExpiry'] ?? 0,
   );
 }
+
+// Sentinel so copyWith can distinguish "not passed" from "explicitly null"
+const Object _sentinel = Object();

@@ -129,12 +129,20 @@ class QuestDetailScreen extends StatelessWidget {
                         value: '+${quest.xpReward} XP',
                         valueColor: AppColors.xpColor,
                       ),
-                      _DetailRow(
-                        icon: Icons.schedule_rounded,
-                        label: 'Deadline',
-                        value: DateFormat('EEE, MMM d — HH:mm').format(quest.deadline),
-                        valueColor: quest.isOverdue ? AppColors.danger : AppColors.textPrimary,
-                      ),
+                      if (quest.hasDeadline)
+                        _DetailRow(
+                          icon: Icons.schedule_rounded,
+                          label: 'Deadline',
+                          value: DateFormat('EEE, MMM d — HH:mm').format(quest.deadline!),
+                          valueColor: quest.isOverdue ? AppColors.danger : AppColors.textPrimary,
+                        )
+                      else
+                        const _DetailRow(
+                          icon: Icons.all_inclusive_rounded,
+                          label: 'Deadline',
+                          value: '∞ No Deadline',
+                          valueColor: AppColors.agilityColor,
+                        ),
                       _DetailRow(
                         icon: Icons.calendar_today_outlined,
                         label: 'Created',

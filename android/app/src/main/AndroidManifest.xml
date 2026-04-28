@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
     <application
-        android:label="solo_leveling_system"
+        android:label="My System"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

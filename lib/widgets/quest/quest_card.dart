@@ -108,8 +108,15 @@ class _QuestCardState extends State<QuestCard> with SingleTickerProviderStateMix
                       // Footer
                       Row(
                         children: [
-                          // Deadline
-                          if (!isLocked) _DeadlineChip(deadline: q.deadline, isOverdue: q.isOverdue),
+                          // Deadline chip
+                          if (!isLocked && q.hasDeadline)
+                            _DeadlineChip(deadline: q.deadline, isOverdue: q.isOverdue),
+                          if (!isLocked && !q.hasDeadline)
+                            _DeadlineChip(
+                              customLabel: '∞ No Deadline',
+                              isOverdue: false,
+                              color: AppColors.agilityColor,
+                            ),
                           if (isLocked)
                             _DeadlineChip(
                               customLabel: 'Unlock at Lv. ${q.unlockLevel}',
@@ -155,6 +162,56 @@ class _QuestCardState extends State<QuestCard> with SingleTickerProviderStateMix
                       if (widget.showActions && !isLocked && q.status == QuestStatus.penalty) ...[
                         const SizedBox(height: 10),
                         const SystemDivider(),
+                        // Countdown + tier badge row
+                        Row(
+                          children: [
+                            // Tier badge
+                            if (q.penaltyTier > 0)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.danger.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                      color: AppColors.danger.withAlpha(120)),
+                                ),
+                                child: Text(
+                                  'TIER ${q.penaltyTier}',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: AppColors.danger,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ),
+                            // Countdown
+                            if (q.deadline != null)
+                              _PenaltyCountdown(deadline: q.deadline!),
+                            const Spacer(),
+                            // XP loss warning
+                            if (q.xpPenaltyOnExpiry > 0)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.remove_circle_outline,
+                                      size: 11, color: AppColors.danger),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${q.xpPenaltyOnExpiry} XP if missed',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.danger,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         SystemButton(
                           label: 'COMPLETE PENALTY',
                           onTap: widget.onComplete ?? () {},
@@ -184,9 +241,8 @@ class _XpBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isPenalty ? AppColors.danger : quest.rarityColor;
-    final label = isPenalty
-        ? '-${quest.penaltyXp ?? 0} XP'
-        : '+${quest.xpReward} XP';
+    // Penalty quests reward XP on completion — show that reward in red
+    final label = '+${quest.xpReward} XP';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -363,5 +419,68 @@ class CompactQuestCard extends StatelessWidget {
       case QuestStatus.locked: return 'LOCKED';
       case QuestStatus.penalty: return 'PENALTY';
     }
+  }
+}
+
+// Live countdown for penalty quests — rebuilds every minute
+class _PenaltyCountdown extends StatefulWidget {
+  final DateTime deadline;
+  const _PenaltyCountdown({required this.deadline});
+
+  @override
+  State<_PenaltyCountdown> createState() => _PenaltyCountdownState();
+}
+
+class _PenaltyCountdownState extends State<_PenaltyCountdown> {
+  late Duration _remaining;
+
+  @override
+  void initState() {
+    super.initState();
+    _update();
+    // Refresh every 60 seconds
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 60));
+      if (!mounted) return false;
+      setState(_update);
+      return mounted;
+    });
+  }
+
+  void _update() {
+    _remaining = widget.deadline.difference(DateTime.now());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isUrgent = _remaining.inHours < 3;
+    final label = _remaining.isNegative
+        ? 'OVERDUE'
+        : _remaining.inHours >= 1
+            ? '${_remaining.inHours}h ${_remaining.inMinutes.remainder(60)}m left'
+            : '${_remaining.inMinutes}m left';
+
+    final color = _remaining.isNegative
+        ? AppColors.danger
+        : isUrgent
+            ? AppColors.warning
+            : AppColors.textMuted;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.timer_outlined, size: 11, color: color),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: color,
+            fontWeight: isUrgent ? FontWeight.w700 : FontWeight.w400,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
   }
 }

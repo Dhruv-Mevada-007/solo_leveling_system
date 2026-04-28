@@ -472,6 +472,13 @@ class _HabitCard extends StatelessWidget {
                         padding: const EdgeInsets.only(right: 6),
                         child: TagChip(label: t, color: AppColors.textMuted),
                       )),
+              if (habit.hasPenalty) ...[
+                TagChip(
+                  label: '⚠ PENALTY',
+                  color: AppColors.danger,
+                ),
+                const SizedBox(width: 6),
+              ],
               const Spacer(),
               if (habit.repeatConfig.endDate != null)
                 Text(

@@ -18,7 +18,14 @@ class QuestProvider extends ChangeNotifier {
   List<Quest> get activeQuests => _quests
       .where((q) => q.status == QuestStatus.active && (q.unlockLevel == null || q.unlockLevel! <= _hunter.level))
       .toList()
-    ..sort((a, b) => a.deadline.compareTo(b.deadline));
+    ..sort((a, b) {
+      // Quests with deadlines come first, sorted by soonest deadline
+      // No-deadline quests go to the bottom
+      if (a.deadline == null && b.deadline == null) return 0;
+      if (a.deadline == null) return 1;
+      if (b.deadline == null) return -1;
+      return a.deadline!.compareTo(b.deadline!);
+    });
 
   List<Quest> get penaltyQuests => _quests
       .where((q) => q.status == QuestStatus.penalty)
@@ -37,10 +44,14 @@ class QuestProvider extends ChangeNotifier {
       .where((q) => q.unlockLevel != null && q.unlockLevel! > _hunter.level)
       .toList();
 
+  List<Quest> get noDeadlineQuests => _quests
+      .where((q) => q.deadline == null && q.status == QuestStatus.active && q.unlockLevel == null)
+      .toList();
+
   List<Quest> get allQuestsForManagement => List.unmodifiable(_quests);
 
   // ── Init ──────────────────────────────────────────────────
-  Future<void> init() async {
+  Future<PenaltyEscalationResult> init() async {
     _isLoading = true;
     notifyListeners();
 
@@ -52,24 +63,92 @@ class QuestProvider extends ChangeNotifier {
       _quests = _defaultQuests();
     }
 
-    _checkOverdueQuests();
+    final result = _checkOverdueQuests();
     _isLoading = false;
     notifyListeners();
+    return result;
   }
 
-  void _checkOverdueQuests() {
+  PenaltyEscalationResult _checkOverdueQuests() {
     bool changed = false;
+    int totalXpLost = 0;
+    int escalatedCount = 0;
+
     for (int i = 0; i < _quests.length; i++) {
       final q = _quests[i];
-      if (q.status == QuestStatus.active && q.deadline.isBefore(DateTime.now())) {
+      if (q.deadline == null) continue;
+      final now = DateTime.now();
+
+      // ── Normal active quest expired → fail it
+      if (q.status == QuestStatus.active && q.deadline!.isBefore(now)) {
         _quests[i] = q.copyWith(status: QuestStatus.failed);
-        if (q.hasPenalty) {
-          _spawnPenaltyQuest(q);
+        if (q.hasPenalty) _spawnPenaltyQuest(q);
+        changed = true;
+      }
+
+      // ── Penalty quest expired without completion → escalate
+      else if (q.status == QuestStatus.penalty && q.deadline!.isBefore(now)) {
+        // Deduct XP for ignoring the penalty
+        final xpLoss = q.xpPenaltyOnExpiry;
+        if (xpLoss > 0) {
+          _hunter.currentXp = (_hunter.currentXp - xpLoss).clamp(0, 999999999);
+          totalXpLost += xpLoss;
+        }
+
+        // Mark old penalty as failed
+        _quests[i] = q.copyWith(status: QuestStatus.failed);
+
+        // Escalate only up to tier 3 — tier 3 is the final punishment, no more spawning
+        if (q.penaltyTier < 3) {
+          _spawnEscalatedPenalty(q);
+          escalatedCount++;
         }
         changed = true;
       }
     }
+
     if (changed) _persist();
+
+    return PenaltyEscalationResult(
+      hadEscalations: escalatedCount > 0 || totalXpLost > 0,
+      escalatedCount: escalatedCount,
+      totalXpLost: totalXpLost,
+    );
+  }
+
+  /// Escalate a failed penalty quest to the next tier
+  void _spawnEscalatedPenalty(Quest failedPenalty) {
+    final tier = failedPenalty.penaltyTier + 1;
+
+    // Each tier: shorter deadline, more XP loss, harsher title
+    final (hours, xpLoss, prefix) = switch (tier) {
+      1 => (12, failedPenalty.xpPenaltyOnExpiry + 50,  '🔴 ESCALATED'),
+      2 => (6,  failedPenalty.xpPenaltyOnExpiry + 100, '💀 SEVERE PENALTY'),
+      _ => (3,  failedPenalty.xpPenaltyOnExpiry + 200, '☠ FINAL WARNING'),
+    };
+
+    // Strip any previous prefix from title to get the core description
+    String coreTitle = failedPenalty.title
+        .replaceAll(RegExp(r'^[⚠🔴💀☠]+\s*(PENALTY:|ESCALATED:|SEVERE PENALTY:|FINAL WARNING:)\s*'), '')
+        .trim();
+
+    final escalated = Quest(
+      title: '$prefix: $coreTitle',
+      description:
+          'You ignored a penalty task. The system grows impatient.\n\n'
+          'Tier $tier punishment — ${hours}h to comply or face greater consequences. '
+          'Every ignored penalty makes the next worse.',
+      xpReward: (failedPenalty.xpReward * 0.5).ceil(),
+      deadline: DateTime.now().add(Duration(hours: hours)),
+      rarity: tier >= 3 ? QuestRarity.epic : QuestRarity.rare,
+      status: QuestStatus.penalty,
+      tags: ['PENALTY', 'TIER $tier', if (tier >= 3) 'FINAL'],
+      hasPenalty: false,
+      penaltyTier: tier,
+      xpPenaltyOnExpiry: xpLoss,
+    );
+
+    _quests.add(escalated);
   }
 
   // ── Quest CRUD ─────────────────────────────────────────────
@@ -148,16 +227,22 @@ class QuestProvider extends ChangeNotifier {
   }
 
   void _spawnPenaltyQuest(Quest failedQuest) {
-    if (failedQuest.penaltyDescription == null) return;
+    if (failedQuest.penaltyDescription == null ||
+        failedQuest.penaltyDescription!.trim().isEmpty) return;
+    final baseXpLoss = ((failedQuest.penaltyXp ?? 0) + 25).clamp(25, 500);
     final penaltyQuest = Quest(
       title: '⚠ PENALTY: ${failedQuest.penaltyDescription}',
-      description: 'You failed "${failedQuest.title}". The system demands compensation. Complete this to avoid further XP loss.',
+      description:
+          'You failed "${failedQuest.title}". The system demands compensation. '
+          'Complete this penalty within 24 hours to avoid further consequences.',
       xpReward: (failedQuest.xpReward * 0.25).toInt(),
       deadline: DateTime.now().add(const Duration(hours: 24)),
       rarity: QuestRarity.common,
       status: QuestStatus.penalty,
-      tags: ['PENALTY'],
+      tags: ['PENALTY', 'QUEST'],
       hasPenalty: false,
+      penaltyTier: 0,
+      xpPenaltyOnExpiry: baseXpLoss,
     );
     _quests.add(penaltyQuest);
   }
@@ -274,6 +359,15 @@ class QuestProvider extends ChangeNotifier {
         hasPenalty: false,
         unlockLevel: 20,
       ),
+      Quest(
+        title: '🎯 Build a Side Project',
+        description: 'Work on a personal project with no time pressure. Complete it at your own pace — no deadline, no failure.',
+        xpReward: 1000,
+        deadline: null, // no deadline
+        rarity: QuestRarity.epic,
+        tags: ['PROJECT', 'SKILL'],
+        hasPenalty: false,
+      ),
     ];
   }
 }
@@ -282,6 +376,17 @@ class LevelUpResult {
   final bool didLevelUp;
   final int newLevel;
   const LevelUpResult({required this.didLevelUp, required this.newLevel});
+}
+
+class PenaltyEscalationResult {
+  final bool hadEscalations;
+  final int escalatedCount;
+  final int totalXpLost;
+  const PenaltyEscalationResult({
+    required this.hadEscalations,
+    required this.escalatedCount,
+    required this.totalXpLost,
+  });
 }
 
 class _AchievementCheck {

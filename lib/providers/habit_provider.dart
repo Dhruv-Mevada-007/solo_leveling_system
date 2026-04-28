@@ -38,12 +38,92 @@ class HabitProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await _storage.init(); // ensure SharedPreferences is ready regardless of order
+    await _storage.init();
     _habits = await _storage.loadHabits();
     if (_habits.isEmpty) _habits = _defaultHabits();
 
+    // Check for missed days and spawn penalties
+    await _checkMissedDaysAndSpawnPenalties();
+
     _isLoading = false;
     notifyListeners();
+  }
+
+  // ── Missed day detection ───────────────────────────────────
+  Future<void> _checkMissedDaysAndSpawnPenalties() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    bool changed = false;
+
+    for (int i = 0; i < _habits.length; i++) {
+      final h = _habits[i];
+
+      // Only check active habits with penalty enabled
+      if (h.status != HabitStatus.active || !h.hasPenalty || h.isExpired) continue;
+
+      // Was it due yesterday?
+      final yesterday = today.subtract(const Duration(days: 1));
+      if (!h.repeatConfig.isDueToday(yesterday)) continue;
+
+      // Was it completed yesterday?
+      if (h.lastCompletedDate == null) {
+        // Never completed — if created before today, it was missed yesterday
+        final createdDay = DateTime(h.createdAt.year, h.createdAt.month, h.createdAt.day);
+        if (createdDay.isBefore(today)) {
+          _spawnHabitPenalty(h);
+          _habits[i] = h.copyWith(totalMissedDays: h.totalMissedDays + 1);
+          changed = true;
+        }
+        continue;
+      }
+
+      final lastDay = DateTime(
+        h.lastCompletedDate!.year,
+        h.lastCompletedDate!.month,
+        h.lastCompletedDate!.day,
+      );
+
+      // If last completed was NOT yesterday (or today), it was missed
+      if (lastDay != yesterday && lastDay != today) {
+        _spawnHabitPenalty(h);
+        _habits[i] = h.copyWith(totalMissedDays: h.totalMissedDays + 1);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await _storage.saveHabits(_habits);
+      await _questProvider.persistHunter();
+    }
+  }
+
+  void _spawnHabitPenalty(Habit habit) {
+    final penaltyDesc = habit.penaltyDescription?.trim().isNotEmpty == true
+        ? habit.penaltyDescription!.trim()
+        : 'Make up for missed "${habit.title}"';
+
+    // Deduct XP immediately if configured
+    if (habit.penaltyXpDeduction != null && habit.penaltyXpDeduction! > 0) {
+      final hunter = _questProvider.hunter;
+      hunter.currentXp =
+          (hunter.currentXp - habit.penaltyXpDeduction!).clamp(0, 999999999);
+    }
+
+    // Spawn penalty quest — identical structure to quest penalties
+    final penaltyQuest = Quest(
+      title: '⚠ PENALTY: $penaltyDesc',
+      description:
+          'You missed "${habit.title}" yesterday. The system demands compensation. '
+          'Complete this penalty within 24 hours to avoid further consequences.',
+      xpReward: (habit.xpReward * 0.25).ceil(),
+      deadline: DateTime.now().add(const Duration(hours: 24)),
+      rarity: QuestRarity.common,
+      status: QuestStatus.penalty,
+      tags: ['PENALTY', 'HABIT'],
+      hasPenalty: false,
+    );
+
+    _questProvider.addQuest(penaltyQuest);
   }
 
   // ── CRUD ───────────────────────────────────────────────────
@@ -104,13 +184,14 @@ class HabitProvider extends ChangeNotifier {
       if (lastDay == yesterday) {
         newStreak++;
       } else if (lastDay != today) {
-        newStreak = 1; // streak broken, start fresh
+        newStreak = 1;
       }
     } else {
       newStreak = 1;
     }
 
-    final newLongest = newStreak > habit.longestStreak ? newStreak : habit.longestStreak;
+    final newLongest =
+        newStreak > habit.longestStreak ? newStreak : habit.longestStreak;
 
     _habits[idx] = habit.copyWith(
       lastCompletedDate: now,
@@ -120,7 +201,6 @@ class HabitProvider extends ChangeNotifier {
       completionHistory: [...habit.completionHistory, today],
     );
 
-    // Award XP via QuestProvider's hunter
     _questProvider.hunter.addXp(habit.xpReward);
 
     bool didLevelUp = false;
@@ -132,7 +212,6 @@ class HabitProvider extends ChangeNotifier {
     }
 
     await _storage.saveHabits(_habits);
-    // Also persist hunter through QuestProvider
     await _questProvider.persistHunter();
     notifyListeners();
 
@@ -143,15 +222,18 @@ class HabitProvider extends ChangeNotifier {
   List<Habit> _defaultHabits() => [
         Habit(
           title: '💧 Drink 2L Water',
-          description: 'Stay hydrated. The body is the temple. The system demands you maintain it.',
+          description:
+              'Stay hydrated. The body is the temple. The system demands you maintain it.',
           xpReward: 50,
           rarity: QuestRarity.common,
           tags: ['HEALTH'],
           repeatConfig: const RepeatConfig(frequency: RepeatFrequency.daily),
+          hasPenalty: false,
         ),
         Habit(
           title: '🧘 10min Meditation',
-          description: 'Clear your mind. Mental fortitude is the foundation of all strength.',
+          description:
+              'Clear your mind. Mental fortitude is the foundation of all strength.',
           xpReward: 80,
           rarity: QuestRarity.rare,
           tags: ['MENTAL', 'HEALTH'],
@@ -159,6 +241,7 @@ class HabitProvider extends ChangeNotifier {
             frequency: RepeatFrequency.weekly,
             weekdays: [1, 2, 3, 4, 5],
           ),
+          hasPenalty: false,
         ),
       ];
 }

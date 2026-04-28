@@ -25,6 +25,7 @@ class _QuestFormSheetState extends State<QuestFormSheet> {
 
   QuestRarity _rarity = QuestRarity.common;
   DateTime _deadline = DateTime.now().add(const Duration(days: 1));
+  bool _hasDeadline = true; // toggle
   List<String> _tags = [];
   bool _hasPenalty = false;
   int? _unlockLevel;
@@ -42,7 +43,8 @@ class _QuestFormSheetState extends State<QuestFormSheet> {
     _unlockCtrl      = TextEditingController(text: q?.unlockLevel?.toString() ?? '');
     if (q != null) {
       _rarity      = q.rarity;
-      _deadline    = q.deadline;
+      _hasDeadline = q.deadline != null;
+      _deadline    = q.deadline ?? DateTime.now().add(const Duration(days: 1));
       _tags        = List.from(q.tags);
       _hasPenalty  = q.hasPenalty;
       _unlockLevel = q.unlockLevel;
@@ -143,24 +145,73 @@ class _QuestFormSheetState extends State<QuestFormSheet> {
 
                           _label('Deadline'),
                           const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: _pickDeadline,
-                            child: GlassContainer(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 13),
-                              child: Row(children: [
-                                const Icon(Icons.calendar_today_outlined,
-                                    size: 16, color: AppColors.textMuted),
-                                const SizedBox(width: 10),
-                                Text(_formatDate(_deadline),
-                                    style: AppTextStyles.body.copyWith(
-                                        color: AppColors.textPrimary)),
-                                const Spacer(),
-                                const Icon(Icons.chevron_right,
-                                    color: AppColors.textMuted, size: 18),
-                              ]),
-                            ),
+                          // No-deadline toggle row
+                          GlassContainer(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Row(children: [
+                              Icon(
+                                _hasDeadline
+                                    ? Icons.schedule_rounded
+                                    : Icons.all_inclusive_rounded,
+                                color: _hasDeadline
+                                    ? AppColors.systemBlue
+                                    : AppColors.agilityColor,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _hasDeadline ? 'Has Deadline' : 'No Deadline',
+                                      style: AppTextStyles.body.copyWith(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                    Text(
+                                      _hasDeadline
+                                          ? 'Quest auto-fails when time runs out'
+                                          : 'Complete at your own pace, forever active',
+                                      style: AppTextStyles.caption,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _hasDeadline,
+                                onChanged: (v) => setState(() => _hasDeadline = v),
+                                activeColor: AppColors.systemBlue,
+                                inactiveThumbColor: AppColors.agilityColor,
+                                inactiveTrackColor:
+                                    AppColors.agilityColor.withAlpha(50),
+                              ),
+                            ]),
                           ),
+                          // Date picker — only shown when deadline is ON
+                          if (_hasDeadline) ...[
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: _pickDeadline,
+                              child: GlassContainer(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 13),
+                                child: Row(children: [
+                                  const Icon(Icons.calendar_today_outlined,
+                                      size: 16, color: AppColors.textMuted),
+                                  const SizedBox(width: 10),
+                                  Text(_formatDate(_deadline),
+                                      style: AppTextStyles.body.copyWith(
+                                          color: AppColors.textPrimary)),
+                                  const Spacer(),
+                                  const Icon(Icons.chevron_right,
+                                      color: AppColors.textMuted, size: 18),
+                                ]),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 14),
 
                           _label('Tags'),
@@ -381,7 +432,7 @@ class _QuestFormSheetState extends State<QuestFormSheet> {
         title: _titleCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         xpReward: xp,
-        deadline: _deadline,
+        deadline: _hasDeadline ? _deadline : null,
         rarity: _rarity,
         tags: _tags,
         hasPenalty: _hasPenalty,
@@ -395,7 +446,7 @@ class _QuestFormSheetState extends State<QuestFormSheet> {
         title: _titleCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         xpReward: xp,
-        deadline: _deadline,
+        deadline: _hasDeadline ? _deadline : null,
         rarity: _rarity,
         tags: _tags,
         hasPenalty: _hasPenalty,

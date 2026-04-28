@@ -22,6 +22,8 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
   late TextEditingController _xpCtrl;
   late TextEditingController _tagCtrl;
   late TextEditingController _nDaysCtrl;
+  late TextEditingController _penaltyDescCtrl;
+  late TextEditingController _penaltyXpCtrl;
 
   QuestRarity _rarity = QuestRarity.common;
   List<String> _tags = [];
@@ -33,27 +35,32 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
   bool _forever = true;
   DateTime? _endDate;
 
+  // Penalty state
+  bool _hasPenalty = false;
+
   static const _dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   @override
   void initState() {
     super.initState();
     final h = widget.habit;
-    _titleCtrl = TextEditingController(text: h?.title ?? '');
-    _descCtrl = TextEditingController(text: h?.description ?? '');
-    _xpCtrl = TextEditingController(text: h?.xpReward.toString() ?? '50');
-    _tagCtrl = TextEditingController();
-    _nDaysCtrl = TextEditingController(
-        text: h?.repeatConfig.everyNDays?.toString() ?? '2');
+    _titleCtrl        = TextEditingController(text: h?.title ?? '');
+    _descCtrl         = TextEditingController(text: h?.description ?? '');
+    _xpCtrl           = TextEditingController(text: h?.xpReward.toString() ?? '50');
+    _tagCtrl          = TextEditingController();
+    _nDaysCtrl        = TextEditingController(text: h?.repeatConfig.everyNDays?.toString() ?? '2');
+    _penaltyDescCtrl  = TextEditingController(text: h?.penaltyDescription ?? '');
+    _penaltyXpCtrl    = TextEditingController(text: h?.penaltyXpDeduction?.toString() ?? '');
 
     if (h != null) {
-      _rarity = h.rarity;
-      _tags = List.from(h.tags);
-      _frequency = h.repeatConfig.frequency;
-      _weekdays = List.from(h.repeatConfig.weekdays);
+      _rarity     = h.rarity;
+      _tags       = List.from(h.tags);
+      _frequency  = h.repeatConfig.frequency;
+      _weekdays   = List.from(h.repeatConfig.weekdays);
       _everyNDays = h.repeatConfig.everyNDays ?? 2;
-      _forever = h.repeatConfig.endDate == null;
-      _endDate = h.repeatConfig.endDate;
+      _forever    = h.repeatConfig.endDate == null;
+      _endDate    = h.repeatConfig.endDate;
+      _hasPenalty = h.hasPenalty;
     }
   }
 
@@ -64,6 +71,8 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
     _xpCtrl.dispose();
     _tagCtrl.dispose();
     _nDaysCtrl.dispose();
+    _penaltyDescCtrl.dispose();
+    _penaltyXpCtrl.dispose();
     super.dispose();
   }
 
@@ -256,6 +265,85 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
                             ),
                           ],
 
+                          const SizedBox(height: 18),
+
+                          // ── PENALTY SECTION ──────────────
+                          GlassContainer(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Row(children: [
+                              const Icon(Icons.warning_amber_rounded,
+                                  color: AppColors.danger, size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Enable Penalty',
+                                        style: AppTextStyles.body.copyWith(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500)),
+                                    Text(
+                                      'Spawn a penalty quest if missed',
+                                      style: AppTextStyles.caption,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _hasPenalty,
+                                onChanged: (v) =>
+                                    setState(() => _hasPenalty = v),
+                                activeColor: AppColors.danger,
+                              ),
+                            ]),
+                          ),
+
+                          if (_hasPenalty) ...[
+                            const SizedBox(height: 10),
+                            _field(
+                              'Penalty Task Description',
+                              _penaltyDescCtrl,
+                              hint: 'e.g. 20 extra pushups',
+                            ),
+                            const SizedBox(height: 10),
+                            _field(
+                              'XP Deduction on Miss (optional)',
+                              _penaltyXpCtrl,
+                              hint: '25',
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger.withAlpha(15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppColors.danger.withAlpha(60)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.info_outline,
+                                      color: AppColors.danger, size: 13),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Penalty quest is auto-spawned when you open the app '
+                                      'after missing a scheduled day. XP is deducted immediately.',
+                                      style: AppTextStyles.caption.copyWith(
+                                          color: AppColors.danger
+                                              .withAlpha(200),
+                                          height: 1.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
                           const SizedBox(height: 28),
                           SystemButton(
                             label: isEdit ? 'UPDATE HABIT' : 'CREATE HABIT',
@@ -316,11 +404,11 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
     if (!_formKey.currentState!.validate()) return;
     final provider = context.read<HabitProvider>();
     final xp = int.tryParse(_xpCtrl.text) ?? 50;
+    final penaltyXp = int.tryParse(_penaltyXpCtrl.text);
     final repeatConfig = RepeatConfig(
       frequency: _frequency,
       weekdays: _weekdays,
-      everyNDays:
-          _frequency == RepeatFrequency.custom ? _everyNDays : null,
+      everyNDays: _frequency == RepeatFrequency.custom ? _everyNDays : null,
       endDate: _forever ? null : _endDate,
     );
 
@@ -332,6 +420,9 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
         rarity: _rarity,
         tags: _tags,
         repeatConfig: repeatConfig,
+        hasPenalty: _hasPenalty,
+        penaltyDescription: _hasPenalty ? _penaltyDescCtrl.text.trim() : null,
+        penaltyXpDeduction: _hasPenalty ? penaltyXp : null,
       ));
     } else {
       provider.updateHabit(widget.habit!.copyWith(
@@ -341,6 +432,9 @@ class _HabitFormSheetState extends State<HabitFormSheet> {
         rarity: _rarity,
         tags: _tags,
         repeatConfig: repeatConfig,
+        hasPenalty: _hasPenalty,
+        penaltyDescription: _hasPenalty ? _penaltyDescCtrl.text.trim() : null,
+        penaltyXpDeduction: _hasPenalty ? penaltyXp : null,
       ));
     }
     Navigator.pop(context);

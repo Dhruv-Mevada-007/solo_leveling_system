@@ -17,11 +17,10 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final List<String> _tabs = ['All', 'Active', 'Completed', 'Failed', 'Locked'];
+  final List<String> _tabs = ['All', 'Active', 'No Deadline', 'Completed', 'Failed', 'Locked'];
 
   String _searchQuery = '';
   String? _filterRarity;
-  String? _filterStatus;
 
   @override
   void initState() {
@@ -54,6 +53,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                     children: [
                       _buildQuestList(provider.allQuestsForManagement, provider),
                       _buildQuestList(provider.activeQuests, provider),
+                      _buildNoDeadlineList(provider.noDeadlineQuests, provider),
                       _buildQuestList(provider.completedQuests, provider),
                       _buildQuestList(provider.failedQuests, provider),
                       _buildQuestList(provider.lockedQuests, provider),
@@ -192,6 +192,72 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => QuestFormSheet(quest: quest),
+    );
+  }
+
+  Widget _buildNoDeadlineList(List<Quest> quests, QuestProvider provider) {
+    final filtered = quests.where((q) {
+      return _searchQuery.isEmpty ||
+          q.title.toLowerCase().contains(_searchQuery) ||
+          q.description.toLowerCase().contains(_searchQuery) ||
+          q.tags.any((t) => t.toLowerCase().contains(_searchQuery));
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.all_inclusive_rounded,
+                size: 40, color: AppColors.agilityColor),
+            const SizedBox(height: 12),
+            Text('No open-ended quests yet',
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.agilityColor)),
+            const SizedBox(height: 4),
+            Text('Create a quest with "No Deadline" to see it here',
+                style: AppTextStyles.caption,
+                textAlign: TextAlign.center),
+          ],
+        ),
+      ).animate().fadeIn(duration: 300.ms);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Row(
+            children: [
+              const Icon(Icons.all_inclusive_rounded,
+                  size: 14, color: AppColors.agilityColor),
+              const SizedBox(width: 6),
+              Text(
+                '${filtered.length} open-ended quest${filtered.length != 1 ? 's' : ''}  •  complete at your own pace',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.agilityColor),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+            physics: const BouncingScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (_, i) {
+              final q = filtered[i];
+              return CompactQuestCard(
+                key: ValueKey(q.id),
+                quest: q,
+                onTap: () => _editQuest(context, q),
+                onDelete: () => _deleteQuest(context, provider, q.id),
+              ).animate(delay: (i * 30).ms).fadeIn(duration: 200.ms).slideX(begin: -0.02);
+            },
+          ),
+        ),
+      ],
     );
   }
 

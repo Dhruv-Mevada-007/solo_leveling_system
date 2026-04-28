@@ -103,6 +103,12 @@ class Habit {
   /// Dates on which this habit was completed (for calendar view)
   List<DateTime> completionHistory;
 
+  // ── Penalty fields ─────────────────────────────────────────
+  bool hasPenalty;
+  String? penaltyDescription;  // what the penalty task says
+  int? penaltyXpDeduction;     // XP lost when missed
+  int totalMissedDays;         // how many days were missed
+
   Habit({
     String? id,
     required this.title,
@@ -118,6 +124,10 @@ class Habit {
     this.lastCompletedDate,
     DateTime? createdAt,
     List<DateTime>? completionHistory,
+    this.hasPenalty = false,
+    this.penaltyDescription,
+    this.penaltyXpDeduction,
+    this.totalMissedDays = 0,
   })  : id = id ?? const Uuid().v4(),
         repeatConfig = repeatConfig ?? const RepeatConfig(),
         createdAt = createdAt ?? DateTime.now(),
@@ -168,6 +178,10 @@ class Habit {
     int? totalCompletions,
     DateTime? lastCompletedDate,
     List<DateTime>? completionHistory,
+    bool? hasPenalty,
+    String? penaltyDescription,
+    int? penaltyXpDeduction,
+    int? totalMissedDays,
   }) =>
       Habit(
         id: id,
@@ -184,6 +198,10 @@ class Habit {
         lastCompletedDate: lastCompletedDate ?? this.lastCompletedDate,
         createdAt: createdAt,
         completionHistory: completionHistory ?? this.completionHistory,
+        hasPenalty: hasPenalty ?? this.hasPenalty,
+        penaltyDescription: penaltyDescription ?? this.penaltyDescription,
+        penaltyXpDeduction: penaltyXpDeduction ?? this.penaltyXpDeduction,
+        totalMissedDays: totalMissedDays ?? this.totalMissedDays,
       );
 
   Map<String, dynamic> toJson() => {
@@ -202,6 +220,10 @@ class Habit {
         'createdAt': createdAt.toIso8601String(),
         'completionHistory':
             completionHistory.map((d) => d.toIso8601String()).toList(),
+        'hasPenalty': hasPenalty,
+        'penaltyDescription': penaltyDescription,
+        'penaltyXpDeduction': penaltyXpDeduction,
+        'totalMissedDays': totalMissedDays,
       };
 
   factory Habit.fromJson(Map<String, dynamic> j) => Habit(
@@ -225,5 +247,9 @@ class Habit {
         completionHistory: (j['completionHistory'] as List<dynamic>? ?? [])
             .map((d) => DateTime.parse(d as String))
             .toList(),
+        hasPenalty: j['hasPenalty'] ?? false,
+        penaltyDescription: j['penaltyDescription'],
+        penaltyXpDeduction: j['penaltyXpDeduction'],
+        totalMissedDays: j['totalMissedDays'] ?? 0,
       );
 }
