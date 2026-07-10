@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/common/common_widgets.dart';
 import '../profile/level_up_dialog.dart';
 import 'habit_form_sheet.dart';
+import 'habit_detail_sheet.dart';
 
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
@@ -186,6 +187,7 @@ class _HabitsScreenState extends State<HabitsScreen>
                 onComplete: () => _completeHabit(context, provider, e.value.id),
                 onEdit: () => _editHabit(context, e.value),
                 onDelete: () => _deleteHabit(context, provider, e.value.id),
+                onTap: () => _openDetail(context, e.value),
               ).animate(delay: (e.key * 50).ms).fadeIn(duration: 250.ms).slideY(begin: 0.04)),
         ],
         if (done.isNotEmpty) ...[
@@ -198,6 +200,7 @@ class _HabitsScreenState extends State<HabitsScreen>
                 isCompleted: true,
                 onEdit: () => _editHabit(context, e.value),
                 onDelete: () => _deleteHabit(context, provider, e.value.id),
+                onTap: () => _openDetail(context, e.value),
               ).animate(delay: (e.key * 40).ms).fadeIn(duration: 200.ms)),
         ],
       ],
@@ -224,6 +227,7 @@ class _HabitsScreenState extends State<HabitsScreen>
           SectionHeader(title: 'ACTIVE HABITS', subtitle: '${active.length} habits'),
           ...active.asMap().entries.map((e) => _HabitManageCard(
                 habit: e.value,
+                onTap: () => _openDetail(context, e.value),
                 onEdit: () => _editHabit(context, e.value),
                 onDelete: () => _deleteHabit(context, provider, e.value.id),
                 onArchive: () => provider.archiveHabit(e.value.id),
@@ -235,6 +239,7 @@ class _HabitsScreenState extends State<HabitsScreen>
           ...archived.map((h) => _HabitManageCard(
                 habit: h,
                 isArchived: true,
+                onTap: () => _openDetail(context, h),
                 onDelete: () => _deleteHabit(context, provider, h.id),
               )),
         ],
@@ -274,6 +279,15 @@ class _HabitsScreenState extends State<HabitsScreen>
         duration: const Duration(seconds: 2),
       ));
     }
+  }
+
+  void _openDetail(BuildContext context, Habit habit) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => HabitDetailSheet(habit: habit),
+    );
   }
 
   void _editHabit(BuildContext context, Habit habit) {
@@ -320,6 +334,7 @@ class _HabitCard extends StatelessWidget {
   final VoidCallback? onComplete;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onTap;
 
   const _HabitCard({
     required this.habit,
@@ -327,13 +342,16 @@ class _HabitCard extends StatelessWidget {
     this.onComplete,
     this.onEdit,
     this.onDelete,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = isCompleted ? AppColors.agilityColor : habit.rarityColor;
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isCompleted
@@ -493,7 +511,8 @@ class _HabitCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+      ), // Container
+    ); // GestureDetector
   }
 }
 
@@ -501,6 +520,7 @@ class _HabitCard extends StatelessWidget {
 class _HabitManageCard extends StatelessWidget {
   final Habit habit;
   final bool isArchived;
+  final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onArchive;
@@ -508,6 +528,7 @@ class _HabitManageCard extends StatelessWidget {
   const _HabitManageCard({
     required this.habit,
     this.isArchived = false,
+    this.onTap,
     this.onEdit,
     this.onDelete,
     this.onArchive,
@@ -515,7 +536,9 @@ class _HabitManageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -584,7 +607,8 @@ class _HabitManageCard extends StatelessWidget {
           constraints: const BoxConstraints(),
         ),
       ]),
-    );
+      ), // Container
+    ); // GestureDetector
   }
 }
 
